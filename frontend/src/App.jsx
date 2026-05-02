@@ -3,6 +3,8 @@ import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-route
 import { Zap, CheckCheck } from 'lucide-react';
 import CourtSelection from './pages/client/CourtSelection';
 import BookingSummary from './pages/client/BookingSummary';
+import Payment from './pages/client/Payment';
+import Confirmation from './pages/client/Confirmation';
 import './styles/design-system.css';
 
 /**
@@ -13,10 +15,10 @@ const StepIndicator = () => {
   const location = useLocation();
 
   const steps = [
-    { label: 'Selección', path: '/' },
-    { label: 'Validación', path: '/checkout' },
-    { label: 'Confirmación', path: '/confirm' },
-    { label: 'Pago', path: '/payment' },
+    { label: 'Selección',    path: '/' },
+    { label: 'Validación',   path: '/checkout' },
+    { label: 'Pago',         path: '/payment' },
+    { label: 'Confirmación', path: '/confirmation' },
   ];
 
   const currentIndex = steps.findIndex(s => s.path === location.pathname);
@@ -73,6 +75,8 @@ function App() {
           <Routes>
             <Route path="/" element={<CourtSelection />} />
             <Route path="/checkout" element={<BookingSummary />} />
+            <Route path="/payment" element={<Payment />} />
+            <Route path="/confirmation" element={<Confirmation />} />
           </Routes>
         </main>
       </div>

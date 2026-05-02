@@ -85,4 +85,16 @@ const createBooking = (cancha_id, fecha, hora) => {
  */
 const findBookingById = (id) => bookings.find(b => b.id === id) || null;
 
-module.exports = { mockFields, bookings, isSlotTaken, createBooking, findBookingById };
+/**
+ * Actualiza el estado de una reserva por su ID.
+ * @returns {object|null} la reserva actualizada, o null si no existe
+ */
+const updateBookingStatus = (id, newEstado) => {
+  const booking = bookings.find(b => b.id === id);
+  if (!booking) return null;
+  booking.estado = newEstado;
+  booking.actualizado_en = new Date().toISOString();
+  return booking;
+};
+
+module.exports = { mockFields, bookings, isSlotTaken, createBooking, findBookingById, updateBookingStatus };

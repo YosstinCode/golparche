@@ -155,9 +155,8 @@ const BookingSummary = () => {
             </button>
             <button
               className="btn btn-primary"
-              disabled
-              style={{ flex: 2, opacity: 0.5, cursor: 'not-allowed' }}
-              title="Disponible en el Incremento 4"
+              style={{ flex: 2 }}
+              onClick={() => navigate('/payment', { state: { booking: confirmedBooking } })}
             >
               <CreditCard size={16} /> Ir a pagar
             </button>

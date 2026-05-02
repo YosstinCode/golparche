@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { isSlotTaken, createBooking, findBookingById, bookings } = require('../bookings.data');
+const { isSlotTaken, createBooking, findBookingById, updateBookingStatus, bookings } = require('../bookings.data');
 
 /**
  * POST /bookings
@@ -56,6 +56,33 @@ router.get('/:id', (req, res) => {
     return res.status(404).json({ error: 'Reserva no encontrada' });
   }
   res.json(booking);
+});
+
+/**
+ * PATCH /bookings/:id/confirm
+ * Incremento 5: Confirms a paid booking, transitioning it from "pagado" → "confirmado".
+ * This is the final step of the booking flow.
+ */
+router.patch('/:id/confirm', (req, res) => {
+  const booking = findBookingById(req.params.id);
+
+  if (!booking) {
+    return res.status(404).json({ error: 'Reserva no encontrada.' });
+  }
+
+  if (booking.estado !== 'pagado') {
+    return res.status(409).json({
+      error: `No se puede confirmar esta reserva. Estado actual: "${booking.estado}". Solo las reservas pagadas pueden confirmarse.`,
+    });
+  }
+
+  const confirmed = updateBookingStatus(req.params.id, 'confirmado');
+  confirmed.confirmado_en = new Date().toISOString();
+
+  return res.status(200).json({
+    message: '¡Reserva confirmada exitosamente!',
+    reserva: confirmed,
+  });
 });
 
 module.exports = router;
