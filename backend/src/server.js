@@ -3,6 +3,7 @@ const cors = require('cors');
 
 const fieldsRoutes = require('./routes/fields.routes');
 const availabilityRoutes = require('./routes/availability.routes');
+const bookingsRoutes = require('./routes/bookings.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -13,6 +14,7 @@ app.use(express.json());
 // Routes
 app.use('/fields', fieldsRoutes);
 app.use('/availability', availabilityRoutes);
+app.use('/bookings', bookingsRoutes);
 
 app.get('/', (req, res) => {
   res.send('Golparche API is running');

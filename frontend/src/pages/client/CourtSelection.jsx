@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const API_BASE_URL = 'http://localhost:3001';
 
@@ -53,9 +54,17 @@ const CourtSelection = () => {
     setSelectedHour(null);
   };
 
+  const navigate = useNavigate();
+
   const handleContinue = () => {
     if (selectedCourt && date && selectedHour) {
-      alert(`¡Selección completada (Incremento 1)!\nCancha: ${selectedCourt.name}\nFecha: ${date}\nHora: ${selectedHour}\n\nListo para el Incremento 2.`);
+      navigate('/checkout', {
+        state: {
+          court: selectedCourt,
+          date,
+          hour: selectedHour
+        }
+      });
     }
   };
 

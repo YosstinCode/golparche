@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import CourtSelection from './pages/client/CourtSelection';
+import BookingSummary from './pages/client/BookingSummary';
 import './styles/design-system.css';
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
         <main>
           <Routes>
             <Route path="/" element={<CourtSelection />} />
+            <Route path="/checkout" element={<BookingSummary />} />
           </Routes>
         </main>
       </div>
