@@ -14,7 +14,7 @@ const StepIndicator = () => {
 
   const steps = [
     { label: 'Selección',    path: '/' },
-    { label: 'Validación',   path: '/booking-summary' },
+    { label: 'Validación',   path: '/checkout' },
     { label: 'Confirmación', path: '/confirm' },
     { label: 'Pago',         path: '/payment' },
   ];
@@ -71,8 +71,8 @@ function App() {
         </header>
         <main>
           <Routes>
-            <Route path="/"                element={<CourtSelection />} />
-            <Route path="/booking-summary" element={<BookingSummary />} />
+            <Route path="/" element={<CourtSelection />} />
+            <Route path="/checkout" element={<BookingSummary />} />
           </Routes>
         </main>
       </div>

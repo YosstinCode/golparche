@@ -93,7 +93,7 @@ const CourtSelection = () => {
         setValidationMessage(data.message);
 
         setTimeout(() => {
-          navigate('/booking-summary', {
+          navigate('/checkout', {
             state: { court: selectedCourt, date, hour: selectedHour },
           });
         }, 1200);
