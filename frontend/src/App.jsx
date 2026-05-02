@@ -13,10 +13,10 @@ const StepIndicator = () => {
   const location = useLocation();
 
   const steps = [
-    { label: 'Selección',    path: '/' },
-    { label: 'Validación',   path: '/checkout' },
+    { label: 'Selección', path: '/' },
+    { label: 'Validación', path: '/checkout' },
     { label: 'Confirmación', path: '/confirm' },
-    { label: 'Pago',         path: '/payment' },
+    { label: 'Pago', path: '/payment' },
   ];
 
   const currentIndex = steps.findIndex(s => s.path === location.pathname);
@@ -24,7 +24,7 @@ const StepIndicator = () => {
   return (
     <div className="step-indicator">
       {steps.map((step, idx) => {
-        const isDone   = idx < currentIndex;
+        const isDone = idx < currentIndex;
         const isActive = idx === currentIndex;
         return (
           <React.Fragment key={step.path}>
@@ -44,8 +44,8 @@ const StepIndicator = () => {
                 color: isActive
                   ? 'var(--primary-color)'
                   : isDone
-                  ? 'rgba(74, 222, 128, 0.8)'
-                  : 'var(--text-secondary)',
+                    ? 'rgba(74, 222, 128, 0.8)'
+                    : 'var(--text-secondary)',
                 whiteSpace: 'nowrap',
               }}
             >
