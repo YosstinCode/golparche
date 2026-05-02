@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { isSlotTaken } = require('../bookings.data');
 
 // Simulated availability
 const getAllHours = () => {
@@ -10,6 +11,11 @@ const getAllHours = () => {
   return hours;
 };
 
+/**
+ * GET /availability
+ * Retorna las horas disponibles para una cancha y fecha dadas.
+ * Query params: cancha_id, fecha
+ */
 router.get('/', (req, res) => {
   const { cancha_id, fecha } = req.query;
 
@@ -31,6 +37,39 @@ router.get('/', (req, res) => {
     cancha_id,
     fecha,
     available_hours: availableHours
+  });
+});
+
+/**
+ * GET /availability/validate
+ * Valida si un slot específico (cancha + fecha + hora) está disponible.
+ * Query params: cancha_id, fecha, hora
+ * 
+ * Respuesta:
+ *   { available: true }
+ *   { available: false, message: "Este horario ya está reservado." }
+ */
+router.get('/validate', (req, res) => {
+  const { cancha_id, fecha, hora } = req.query;
+
+  if (!cancha_id || !fecha || !hora) {
+    return res.status(400).json({
+      error: 'cancha_id, fecha y hora son requeridos'
+    });
+  }
+
+  const taken = isSlotTaken(cancha_id, fecha, hora);
+
+  if (taken) {
+    return res.status(200).json({
+      available: false,
+      message: `El horario ${hora} del ${fecha} ya está reservado para esta cancha.`
+    });
+  }
+
+  return res.status(200).json({
+    available: true,
+    message: '¡Horario disponible! Puedes continuar con tu reserva.'
   });
 });
 
