@@ -1,29 +1,17 @@
 const express = require('express');
 const router = express.Router();
-const { findBookingById, updateBookingStatus } = require('../bookings.data');
+const { supabaseAdmin } = require('../config/supabase');
 
 /**
  * POST /payments
- * Simulates a payment for a booking.
+ * Simula un pago y guarda el registro en la tabla pagos de Supabase.
  *
- * Body: {
- *   booking_id: string,
- *   card_number: string,   // 16 digits
- *   card_holder: string,
- *   expiry: string,        // MM/YY
- *   cvv: string            // 3 digits
- * }
- *
- * Validation rules (simulation):
- *  - booking must exist and be in "pendiente" state
- *  - card_number must be 16 digits
- *  - cvv must NOT be "000" (simulate decline)
- *  - expiry must be present
+ * Body: { booking_id, card_number, card_holder, expiry, cvv }
  */
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   const { booking_id, card_number, card_holder, expiry, cvv } = req.body;
 
-  // ── Field validation ───────────────────────────────────────────
+  // ── Validación de campos ────────────────────────────────────────
   if (!booking_id || !card_number || !card_holder || !expiry || !cvv) {
     return res.status(400).json({ error: 'Todos los campos de pago son requeridos.' });
   }
@@ -41,9 +29,14 @@ router.post('/', (req, res) => {
     return res.status(400).json({ error: 'El CVV debe tener 3 dígitos.' });
   }
 
-  // ── Booking lookup ─────────────────────────────────────────────
-  const booking = findBookingById(booking_id);
-  if (!booking) {
+  // ── Buscar la reserva en Supabase ───────────────────────────────
+  const { data: booking, error: fetchError } = await supabaseAdmin
+    .from('reservas')
+    .select('id, estado, precio_total')
+    .eq('id', booking_id)
+    .single();
+
+  if (fetchError || !booking) {
     return res.status(404).json({ error: 'Reserva no encontrada. Verifica el ID.' });
   }
 
@@ -53,23 +46,51 @@ router.post('/', (req, res) => {
     });
   }
 
-  // ── Payment simulation ─────────────────────────────────────────
-  // Decline rule: CVV "000" simulates a declined card
+  // ── Simular pasarela de pago (CVV 000 = rechazado) ─────────────
   if (cvv === '000') {
+    // Registrar el intento fallido en pagos
+    await supabaseAdmin.from('pagos').insert([{
+      reserva_id: booking_id,
+      monto: booking.precio_total,
+      estado: 'rechazado',
+      transaccion_id: `TXN-REJECTED-${Date.now()}`,
+      ultimos4: cleanCardNumber.slice(-4),
+    }]);
+
     return res.status(402).json({
       approved: false,
       error: 'Pago rechazado. Tu tarjeta fue declinada. Verifica los datos e intenta de nuevo.',
     });
   }
 
-  // Approve: update booking state to "pagado"
-  const updatedBooking = updateBookingStatus(booking_id, 'pagado');
+  const transaccion_id = `TXN-${Date.now()}`;
+
+  // ── Guardar el pago aprobado ────────────────────────────────────
+  await supabaseAdmin.from('pagos').insert([{
+    reserva_id: booking_id,
+    monto: booking.precio_total,
+    estado: 'aprobado',
+    transaccion_id,
+    ultimos4: cleanCardNumber.slice(-4),
+  }]);
+
+  // ── Actualizar estado de la reserva a "pagado" ──────────────────
+  const { data: updatedBooking, error: updateError } = await supabaseAdmin
+    .from('reservas')
+    .update({ estado: 'pagado', updated_at: new Date().toISOString() })
+    .eq('id', booking_id)
+    .select('*')
+    .single();
+
+  if (updateError) {
+    return res.status(500).json({ error: updateError.message });
+  }
 
   return res.status(200).json({
     approved: true,
     message: '¡Pago aprobado! Tu reserva ha sido pagada exitosamente.',
     reserva: updatedBooking,
-    transaccion_id: `TXN-${Date.now()}`,
+    transaccion_id,
   });
 });
 

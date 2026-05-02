@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import {
   Calendar,
   Clock,
@@ -20,6 +21,7 @@ const API_BASE_URL = 'http://localhost:3001';
 const BookingSummary = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [bookingStatus, setBookingStatus] = useState('idle'); // idle | loading | success | error
   const [confirmedBooking, setConfirmedBooking] = useState(null);
@@ -52,7 +54,13 @@ const BookingSummary = () => {
       const response = await fetch(`${API_BASE_URL}/bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cancha_id: court.id, fecha: date, hora: hour }),
+        body: JSON.stringify({
+          cancha_id: court.id,
+          fecha: date,
+          hora: hour,
+          user_id: user?.id,
+          precio_total: court.precio_hora,
+        }),
       });
 
       const data = await response.json();
@@ -202,13 +210,13 @@ const BookingSummary = () => {
       <div className="summary-card" style={{ marginBottom: '2rem' }}>
         <div className="summary-card-header">
           <img
-            src={court.image_url}
-            alt={court.name}
+            src={court.imagen_url}
+            alt={court.nombre}
             style={{ width: '64px', height: '64px', borderRadius: '12px', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.1)' }}
           />
           <div>
-            <h3 style={{ margin: '0 0 0.25rem 0', fontSize: '1.25rem' }}>{court.name}</h3>
-            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{court.description}</p>
+            <h3 style={{ margin: '0 0 0.25rem 0', fontSize: '1.25rem' }}>{court.nombre}</h3>
+            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{court.descripcion}</p>
           </div>
         </div>
 
@@ -227,14 +235,14 @@ const BookingSummary = () => {
           </div>
           <div className="summary-row">
             <span className="summary-label"><Wallet size={15} /> Precio por hora</span>
-            <span className="summary-value-accent">${court.price_per_hour.toLocaleString('es-CO')} COP</span>
+            <span className="summary-value-accent">${court.precio_hora.toLocaleString('es-CO')} COP</span>
           </div>
           <div className="summary-row" style={{ paddingTop: '1.25rem', marginTop: '0.5rem', borderTop: '2px solid rgba(255,255,255,0.07)' }}>
             <span className="summary-label" style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '1rem' }}>
               <Receipt size={15} /> Total a pagar
             </span>
             <span className="summary-value-accent" style={{ fontSize: '1.5rem' }}>
-              ${court.price_per_hour.toLocaleString('es-CO')} COP
+              ${court.precio_hora.toLocaleString('es-CO')} COP
             </span>
           </div>
         </div>

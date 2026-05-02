@@ -460,3 +460,112 @@ h1, h2, h3 {
   background: linear-gradient(to right, rgba(34,197,94,0.5), rgba(0,210,255,0.3));
 }
 
+/* ─── Auth Pages ─────────────────────────────────────────────── */
+.auth-container {
+  min-height: calc(100vh - 8rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 440px;
+  padding: 2.5rem;
+  animation: fadeSlideIn 0.4s ease-out;
+}
+
+.auth-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.auth-title {
+  text-align: center;
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem 0;
+}
+
+.auth-subtitle {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin: 0 0 1rem 0;
+}
+
+.auth-footer {
+  text-align: center;
+  margin-top: 1.75rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+/* ─── Danger button variant ──────────────────────────────────── */
+.btn-danger {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+/* ─── Header Navigation ───────────────────────────────────────── */
+.header-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--surface-light);
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.header-user-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.user-name-display {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+@media (max-width: 768px) {
+  .header-nav {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 1.5rem;
+  }
+  
+  .step-indicator {
+    display: none; /* Hide step indicator on small screens to save space */
+  }
+
+  .header-user-controls {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .user-name-display {
+    display: none; /* Hide username text, keep just the buttons on mobile */
+  }
+}
+
+

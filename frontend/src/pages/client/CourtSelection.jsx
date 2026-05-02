@@ -133,12 +133,12 @@ const CourtSelection = () => {
                 className={`court-card glass-panel ${selectedCourt?.id === court.id ? 'selected' : ''}`}
                 onClick={() => handleCourtSelect(court)}
               >
-                <img src={court.image_url} alt={court.name} className="court-image" />
+                <img src={court.imagen_url} alt={court.nombre} className="court-image" />
                 <div className="court-content">
-                  <h4 className="court-title">{court.name}</h4>
-                  <p className="court-desc">{court.description}</p>
+                  <h4 className="court-title">{court.nombre}</h4>
+                  <p className="court-desc">{court.descripcion}</p>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span className="court-price">${court.price_per_hour.toLocaleString('es-CO')} / hr</span>
+                    <span className="court-price">${court.precio_hora.toLocaleString('es-CO')} / hr</span>
                     <button
                       className={`btn ${selectedCourt?.id === court.id ? 'btn-primary' : 'btn-outline'}`}
                       style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
