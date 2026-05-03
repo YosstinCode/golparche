@@ -1,20 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import {
-  Calendar,
-  Clock,
-  Timer,
-  Wallet,
-  Receipt,
-  CheckCircle,
-  XCircle,
-  ArrowLeft,
-  AlertTriangle,
-  Loader2,
-  CreditCard,
-  ShieldCheck,
+import { 
+  Calendar, Clock, MapPin, ChevronRight, 
+  ArrowLeft, Info, Star, Users, CheckCircle
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const API_BASE_URL = 'http://localhost:3001';
 
@@ -22,271 +12,309 @@ const BookingSummary = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { court } = location.state || {};
 
-  const [bookingStatus, setBookingStatus] = useState('idle'); // idle | loading | success | error
-  const [confirmedBooking, setConfirmedBooking] = useState(null);
-  const [errorMessage, setErrorMessage] = useState('');
+  const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedHora, setSelectedHora] = useState(null);
+  const [disponibilidad, setDisponibilidad] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const { court, date, hour } = location.state || {};
+  const ALL_HOURS = ['14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00'];
 
-  // Guard: redirect if arrived without data
+  // Redirigir si no hay cancha seleccionada
   useEffect(() => {
-    if (!court || !date || !hour) {
-      navigate('/');
+    if (!court) navigate('/');
+  }, [court, navigate]);
+
+  useEffect(() => {
+    if (court && fecha) {
+      setLoading(true);
+      fetch(`${API_BASE_URL}/availability?cancha_id=${court.id}&fecha=${fecha}`)
+        .then(res => res.json())
+        .then(data => {
+          const available = Array.isArray(data.available_hours) ? data.available_hours : [];
+          // Creamos el grid completo de horas marcando disponibilidad
+          const fullSchedule = ALL_HOURS.map(h => ({
+            hora: h,
+            disponible: available.includes(h)
+          }));
+          setDisponibilidad(fullSchedule);
+          setLoading(false);
+          setSelectedHora(null);
+        })
+        .catch(() => {
+          setDisponibilidad([]);
+          setLoading(false);
+        });
     }
-  }, [court, date, hour, navigate]);
+  }, [court, fecha]);
 
-  if (!court || !date || !hour) return null;
+  if (!court) return null;
 
-  const formattedDate = new Date(date + 'T12:00:00').toLocaleDateString('es-CO', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-
-  // ── Incremento 3: Create the booking via POST /bookings ─────────
-  const handleConfirmBooking = async () => {
-    setBookingStatus('loading');
-    setErrorMessage('');
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/bookings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cancha_id: court.id,
-          fecha: date,
-          hora: hour,
-          user_id: user?.id,
-          precio_total: court.precio_hora,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Error al crear la reserva');
-      }
-
-      setBookingStatus('success');
-      setConfirmedBooking(data.reserva);
-
-    } catch (error) {
-      setBookingStatus('error');
-      setErrorMessage(error.message);
-    }
+  const handleContinue = () => {
+    const bookingData = {
+      ...court,
+      cancha_id: court.id,
+      cancha_nombre: court.nombre,
+      fecha,
+      hora: selectedHora,
+      precio_total: court.precio_hora
+    };
+    navigate('/payment', { state: { booking: bookingData } });
   };
 
-  // ── Confirmed state ─────────────────────────────────────────────
-  if (bookingStatus === 'success' && confirmedBooking) {
-    return (
-      <div style={{ animation: 'pageSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)' }}>
-        <div style={{ maxWidth: '560px', margin: '0 auto' }}>
+  return (
+    <div className="checkout-page animate-fade">
+      <div className="checkout-header">
+        <button className="btn-back" onClick={() => navigate('/')}>
+          <ArrowLeft size={20} /> <span>Volver a canchas</span>
+        </button>
+        <h1 className="checkout-title">Reserva tu <span className="text-gradient">Turno</span></h1>
+      </div>
 
-          {/* Success hero */}
-          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-            <div style={{
-              width: '72px', height: '72px', borderRadius: '50%',
-              background: 'rgba(34, 197, 94, 0.15)',
-              border: '2px solid rgba(34, 197, 94, 0.4)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              margin: '0 auto 1.25rem',
-              boxShadow: '0 0 30px rgba(34, 197, 94, 0.2)',
-            }}>
-              <CheckCircle size={38} style={{ color: 'var(--success-color)' }} />
-            </div>
-            <h2 style={{ margin: '0 0 0.5rem', color: 'var(--success-color)' }}>¡Reserva creada!</h2>
-            <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
-              Tu reserva está <strong style={{ color: 'var(--accent-color)' }}>PENDIENTE</strong> de pago. Tienes 15 minutos para completarla.
-            </p>
+      <div className="checkout-grid">
+        {/* Left: Court Info */}
+        <div className="court-detail-panel glass-card">
+          <div className="detail-image-wrapper">
+            <img src={court.imagen_url} alt={court.nombre} className="detail-image" />
+            <div className="court-type-tag">{court.tipo}</div>
           </div>
-
-          {/* Booking receipt */}
-          <div className="summary-card" style={{ marginBottom: '1.5rem' }}>
-            <div className="summary-card-header">
-              <ShieldCheck size={22} style={{ color: 'var(--primary-color)', flexShrink: 0 }} />
+          
+          <div className="detail-content">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
               <div>
-                <div style={{ fontWeight: 700, fontSize: '1rem' }}>Comprobante de reserva</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.1rem', fontFamily: 'monospace' }}>
-                  ID: {confirmedBooking.id.split('-')[0].toUpperCase()}
+                <h2 className="court-name">{court.nombre}</h2>
+                <div className="location-row">
+                  <MapPin size={16} /> <span>Girardot, Cundinamarca</span>
                 </div>
               </div>
+              <div className="rating-box">
+                <Star size={14} fill="var(--accent)" color="var(--accent)" />
+                <span>4.9</span>
+              </div>
             </div>
 
-            <div className="summary-card-body">
-              <div className="summary-row">
-                <span className="summary-label"><Calendar size={14} /> Cancha</span>
-                <span className="summary-value">{confirmedBooking.cancha_nombre}</span>
+            <p className="court-description">
+              Cancha reglamentaria con excelente iluminación LED, grama de alta calidad y zona de hidratación. Perfecta para torneos o partidos amistosos.
+            </p>
+
+            <div className="features-grid">
+              <div className="feature-item">
+                <Users size={18} />
+                <span>5 vs 5</span>
               </div>
-              <div className="summary-row">
-                <span className="summary-label"><Calendar size={14} /> Fecha</span>
-                <span className="summary-value" style={{ textTransform: 'capitalize' }}>{formattedDate}</span>
+              <div className="feature-item">
+                <Clock size={18} />
+                <span>60 min</span>
               </div>
-              <div className="summary-row">
-                <span className="summary-label"><Clock size={14} /> Hora</span>
-                <span className="summary-value">{confirmedBooking.hora}</span>
+              <div className="feature-item">
+                <CheckCircle size={18} />
+                <span>Iluminación</span>
               </div>
-              <div className="summary-row">
-                <span className="summary-label"><Timer size={14} /> Duración</span>
-                <span className="summary-value">1 hora</span>
-              </div>
-              <div className="summary-row" style={{ borderTop: '2px solid rgba(255,255,255,0.07)', paddingTop: '1.25rem', marginTop: '0.5rem' }}>
-                <span className="summary-label" style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '1rem' }}>
-                  <Receipt size={15} /> Total a pagar
-                </span>
-                <span className="summary-value-accent" style={{ fontSize: '1.5rem' }}>
-                  ${confirmedBooking.precio_total.toLocaleString('es-CO')} COP
-                </span>
-              </div>
+            </div>
+
+            <div className="price-summary">
+              <span className="price-label">Precio por hora</span>
+              <span className="price-amount">${court.precio_hora.toLocaleString('es-CO')} COP</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Selection Panel */}
+        <div className="selection-panel glass-card">
+          <div className="panel-section">
+            <h3 className="panel-title"><Calendar size={20} /> Selecciona la Fecha</h3>
+            <div className="date-picker-wrapper">
+              <input 
+                type="date" 
+                className="form-input custom-date"
+                value={fecha}
+                min={new Date().toISOString().split('T')[0]}
+                onChange={(e) => setFecha(e.target.value)}
+              />
             </div>
           </div>
 
-          {/* Next increment notice */}
-          <div className="status-banner" style={{
-            background: 'rgba(252,163,17,0.08)',
-            border: '1px solid rgba(252,163,17,0.3)',
-            color: 'var(--accent-color)', marginTop: 0, marginBottom: '2rem',
-          }}>
-            <CreditCard size={18} style={{ flexShrink: 0 }} />
-            <div>
-              <div style={{ fontWeight: 600 }}>Incremento 4 – Pago</div>
-              <div style={{ fontSize: '0.82rem', opacity: 0.8, marginTop: '0.15rem' }}>
-                El módulo de pago estará disponible en el siguiente incremento.
-              </div>
+          <div className="panel-section">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h3 className="panel-title"><Clock size={20} /> Horarios Disponibles</h3>
+              {loading && <div className="spinner-sm"></div>}
             </div>
+
+            <div className="slots-grid">
+              {disponibilidad.map(slot => (
+                <button
+                  key={slot.hora}
+                  disabled={!slot.disponible}
+                  className={`slot-btn ${selectedHora === slot.hora ? 'selected' : ''}`}
+                  onClick={() => setSelectedHora(slot.hora)}
+                >
+                  <span className="slot-time">{slot.hora.substring(0, 5)}</span>
+                  <span className="slot-status">{slot.disponible ? 'Libre' : 'Ocupado'}</span>
+                </button>
+              ))}
+            </div>
+
+            {!loading && disponibilidad.length === 0 && (
+              <div className="empty-slots">
+                <Info size={24} />
+                <p>No hay turnos disponibles para esta fecha.</p>
+              </div>
+            )}
           </div>
 
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <button className="btn btn-outline" onClick={() => navigate('/')} style={{ flex: 1 }}>
-              <ArrowLeft size={16} /> Nueva reserva
-            </button>
-            <button
-              className="btn btn-primary"
-              style={{ flex: 2 }}
-              onClick={() => navigate('/payment', { state: { booking: confirmedBooking } })}
+          <div className="selection-footer">
+            <div className="summary-info">
+              {selectedHora ? (
+                <p className="summary-text">
+                  Reserva para el <strong>{fecha}</strong> a las <strong>{selectedHora.substring(0, 5)}</strong>
+                </p>
+              ) : (
+                <p className="summary-hint">Por favor selecciona un horario</p>
+              )}
+            </div>
+            
+            <button 
+              className="btn btn-primary btn-full" 
+              disabled={!selectedHora}
+              onClick={handleContinue}
             >
-              <CreditCard size={16} /> Ir a pagar
+              Continuar al Pago <ChevronRight size={20} />
             </button>
           </div>
         </div>
-
-        <style>{`
-          @keyframes pageSlideIn {
-            from { opacity: 0; transform: translateX(30px); }
-            to   { opacity: 1; transform: translateX(0); }
-          }
-        `}</style>
-      </div>
-    );
-  }
-
-  // ── Default: summary + confirm button ───────────────────────────
-  return (
-    <div style={{ animation: 'pageSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)' }}>
-
-      {/* Page header */}
-      <div style={{ marginBottom: '2rem' }}>
-        <button
-          className="btn btn-outline"
-          onClick={() => navigate('/')}
-          style={{ padding: '0.5rem 1.25rem', fontSize: '0.875rem', marginBottom: '1.5rem' }}
-          disabled={bookingStatus === 'loading'}
-        >
-          <ArrowLeft size={16} /> Volver
-        </button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-          <h2 style={{ margin: 0 }}>Resumen de tu reserva</h2>
-          <span className="badge badge-success">
-            <CheckCircle size={12} /> Horario disponible
-          </span>
-        </div>
-        <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-          Revisa los detalles y confirma para crear la reserva.
-        </p>
-      </div>
-
-      {/* Summary card */}
-      <div className="summary-card" style={{ marginBottom: '2rem' }}>
-        <div className="summary-card-header">
-          <img
-            src={court.imagen_url}
-            alt={court.nombre}
-            style={{ width: '64px', height: '64px', borderRadius: '12px', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.1)' }}
-          />
-          <div>
-            <h3 style={{ margin: '0 0 0.25rem 0', fontSize: '1.25rem' }}>{court.nombre}</h3>
-            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{court.descripcion}</p>
-          </div>
-        </div>
-
-        <div className="summary-card-body">
-          <div className="summary-row">
-            <span className="summary-label"><Calendar size={15} /> Fecha</span>
-            <span className="summary-value" style={{ textTransform: 'capitalize' }}>{formattedDate}</span>
-          </div>
-          <div className="summary-row">
-            <span className="summary-label"><Clock size={15} /> Hora</span>
-            <span className="summary-value">{hour}</span>
-          </div>
-          <div className="summary-row">
-            <span className="summary-label"><Timer size={15} /> Duración</span>
-            <span className="summary-value">1 hora</span>
-          </div>
-          <div className="summary-row">
-            <span className="summary-label"><Wallet size={15} /> Precio por hora</span>
-            <span className="summary-value-accent">${court.precio_hora.toLocaleString('es-CO')} COP</span>
-          </div>
-          <div className="summary-row" style={{ paddingTop: '1.25rem', marginTop: '0.5rem', borderTop: '2px solid rgba(255,255,255,0.07)' }}>
-            <span className="summary-label" style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '1rem' }}>
-              <Receipt size={15} /> Total a pagar
-            </span>
-            <span className="summary-value-accent" style={{ fontSize: '1.5rem' }}>
-              ${court.precio_hora.toLocaleString('es-CO')} COP
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Error banner */}
-      {bookingStatus === 'error' && (
-        <div className="status-banner status-banner-error" style={{ marginBottom: '1.5rem' }}>
-          <XCircle size={20} style={{ flexShrink: 0 }} />
-          <div>
-            <div style={{ fontWeight: 600 }}>No se pudo crear la reserva</div>
-            <div style={{ fontSize: '0.85rem', opacity: 0.85, marginTop: '0.2rem' }}>{errorMessage}</div>
-          </div>
-        </div>
-      )}
-
-      {/* Action footer */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-        <button
-          className="btn btn-outline"
-          onClick={() => navigate('/')}
-          style={{ padding: '0.9rem 1.75rem' }}
-          disabled={bookingStatus === 'loading'}
-        >
-          <ArrowLeft size={16} /> Cambiar selección
-        </button>
-        <button
-          className="btn btn-primary"
-          onClick={handleConfirmBooking}
-          disabled={bookingStatus === 'loading'}
-          style={{ padding: '0.9rem 2rem', fontSize: '1rem' }}
-        >
-          {bookingStatus === 'loading' ? (
-            <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Creando reserva...</>
-          ) : (
-            <><CheckCircle size={16} /> Confirmar reserva</>
-          )}
-        </button>
       </div>
 
       <style>{`
-        @keyframes pageSlideIn {
-          from { opacity: 0; transform: translateX(30px); }
-          to   { opacity: 1; transform: translateX(0); }
+        .checkout-page { padding-bottom: 5rem; }
+        .checkout-header { margin-bottom: 3rem; text-align: center; }
+        .btn-back {
+          background: transparent;
+          border: none;
+          color: var(--text-muted);
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          cursor: pointer;
+          font-weight: 600;
+          margin-bottom: 1rem;
+          transition: var(--transition);
+        }
+        .btn-back:hover { color: var(--primary); }
+        .checkout-title { font-size: 3rem; }
+
+        .checkout-grid {
+          display: grid;
+          grid-template-columns: 1fr 1.2fr;
+          gap: 2.5rem;
+          align-items: start;
+        }
+
+        /* Detail Panel */
+        .court-detail-panel { overflow: hidden; }
+        .detail-image-wrapper { position: relative; }
+        .detail-image { width: 100%; height: 300px; object-fit: cover; }
+        .court-type-tag {
+          position: absolute;
+          bottom: 1.5rem;
+          left: 1.5rem;
+          background: var(--primary);
+          color: #000;
+          padding: 0.4rem 1rem;
+          border-radius: 10px;
+          font-weight: 800;
+          text-transform: uppercase;
+          font-size: 0.75rem;
+        }
+        .detail-content { padding: 2.5rem; }
+        .court-name { font-size: 2rem; margin-bottom: 0.5rem; }
+        .location-row { display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted); font-size: 0.9rem; }
+        .rating-box {
+          background: rgba(255,255,255,0.05);
+          padding: 0.5rem 0.75rem;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+          font-weight: 700;
+        }
+        .court-description { color: var(--text-muted); margin: 1.5rem 0 2rem; line-height: 1.6; }
+        .features-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 1rem;
+          margin-bottom: 2.5rem;
+        }
+        .feature-item {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.5rem;
+          background: rgba(255,255,255,0.03);
+          padding: 1rem;
+          border-radius: 16px;
+          color: var(--text-muted);
+          font-size: 0.8rem;
+          font-weight: 600;
+        }
+        .feature-item svg { color: var(--primary); }
+        .price-summary {
+          border-top: 1px solid rgba(255,255,255,0.05);
+          padding-top: 1.5rem;
+          display: flex;
+          flex-direction: column;
+        }
+        .price-label { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.25rem; }
+        .price-amount { font-size: 2rem; font-weight: 800; color: var(--accent); font-family: 'Outfit', sans-serif; }
+
+        /* Selection Panel */
+        .selection-panel { padding: 2.5rem; }
+        .panel-section { margin-bottom: 2.5rem; }
+        .panel-title { display: flex; align-items: center; gap: 0.75rem; font-size: 1.25rem; margin-bottom: 1.5rem; }
+        .slots-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+          gap: 0.75rem;
+        }
+        .slot-btn {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding: 0.85rem;
+          border-radius: 16px;
+          background: rgba(255,255,255,0.03);
+          border: 1px solid rgba(255,255,255,0.08);
+          color: var(--text-muted);
+          cursor: pointer;
+          transition: var(--transition);
+        }
+        .slot-btn:hover:not(:disabled) {
+          border-color: var(--primary);
+          background: rgba(0, 210, 255, 0.05);
+        }
+        .slot-btn.selected {
+          background: var(--primary);
+          color: #000;
+          border-color: var(--primary);
+          box-shadow: 0 0 20px var(--primary-glow);
+        }
+        .slot-btn:disabled { opacity: 0.2; cursor: not-allowed; }
+        .slot-time { font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 1.1rem; }
+        .slot-status { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.2rem; font-weight: 700; }
+        
+        .selection-footer {
+          border-top: 1px solid rgba(255,255,255,0.05);
+          padding-top: 2rem;
+        }
+        .summary-info { margin-bottom: 1.5rem; text-align: center; }
+        .summary-text { font-size: 1rem; color: var(--text-main); }
+        .summary-hint { color: var(--text-dim); font-size: 0.9rem; font-style: italic; }
+        .btn-full { width: 100%; padding: 1.1rem; font-size: 1.1rem; }
+
+        .custom-date { background: rgba(0, 210, 255, 0.05); border-color: var(--primary-glow); }
+
+        @media (max-width: 1024px) {
+          .checkout-grid { grid-template-columns: 1fr; }
         }
       `}</style>
     </div>

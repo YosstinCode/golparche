@@ -18,7 +18,7 @@ const generateBookingCode = () => {
  * Query params: cancha_id, fecha, estado
  */
 router.get('/bookings', async (req, res) => {
-  const { cancha_id, fecha, estado } = req.query;
+  const { cancha_id, fecha, fecha_inicio, fecha_fin, estado } = req.query;
 
   let query = supabaseAdmin
     .from('reservas')
@@ -32,6 +32,8 @@ router.get('/bookings', async (req, res) => {
 
   if (cancha_id) query = query.eq('cancha_id', cancha_id);
   if (fecha)     query = query.eq('fecha', fecha);
+  if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
+  if (fecha_fin)    query = query.lte('fecha', fecha_fin);
   if (estado)    query = query.eq('estado', estado);
 
   const { data, error } = await query;
@@ -221,55 +223,67 @@ router.get('/stats', async (req, res) => {
  * El administrador confirma el pago → genera código de reserva único.
  */
 router.patch('/bookings/:id/confirm', async (req, res) => {
-  const { data: booking, error: fetchError } = await supabaseAdmin
-    .from('reservas')
-    .select('id, estado')
-    .eq('id', req.params.id)
-    .single();
-
-  if (fetchError || !booking) {
-    return res.status(404).json({ error: 'Reserva no encontrada.' });
-  }
-
-  if (booking.estado !== 'pagado') {
-    return res.status(409).json({
-      error: `No se puede confirmar esta reserva. Estado actual: "${booking.estado}".`,
-    });
-  }
-
-  // Generar código único (reintentar si hay colisión)
-  let codigo;
-  let intentos = 0;
-  while (!codigo && intentos < 5) {
-    const candidato = generateBookingCode();
-    const { data: existing } = await supabaseAdmin
+  try {
+    console.log('--- INICIO CONFIRMACIÓN ---');
+    const { data: booking, error: fetchError } = await supabaseAdmin
       .from('reservas')
-      .select('id')
-      .eq('codigo_reserva', candidato)
-      .maybeSingle();
-    if (!existing) codigo = candidato;
-    intentos++;
+      .select('id, estado')
+      .eq('id', req.params.id)
+      .single();
+
+    if (fetchError || !booking) {
+      console.log('Error 404: Reserva no encontrada');
+      return res.status(404).json({ error: 'Reserva no encontrada.' });
+    }
+
+    console.log('ID:', req.params.id, 'Estado:', booking.estado);
+
+    // Generar código único
+    let codigo = '';
+    let intentos = 0;
+    while (!codigo && intentos < 5) {
+      const candidato = generateBookingCode();
+      const { data: existing } = await supabaseAdmin
+        .from('reservas')
+        .select('id')
+        .eq('codigo_reserva', candidato)
+        .maybeSingle();
+      if (!existing) codigo = candidato;
+      intentos++;
+    }
+
+    if (!codigo) {
+      console.log('Error: No se pudo generar un código único');
+      return res.status(500).json({ error: 'Error generando código de reserva.' });
+    }
+
+    console.log('Generado código:', codigo);
+
+    const { data, error } = await supabaseAdmin
+      .from('reservas')
+      .update({
+        estado: 'confirmado',
+        codigo_reserva: codigo,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', req.params.id)
+      .select('*')
+      .single();
+
+    if (error) {
+      console.log('Error DB al actualizar:', error);
+      return res.status(409).json({ error: 'Conflicto en base de datos: ' + error.message });
+    }
+
+    console.log('Reserva confirmada OK');
+    return res.status(200).json({
+      message: '¡Reserva confirmada exitosamente!',
+      reserva: data,
+    });
+  } catch (err) {
+    console.error('CRASH en confirm:', err);
+    return res.status(500).json({ error: 'Error interno: ' + err.message });
   }
-
-  const { data, error } = await supabaseAdmin
-    .from('reservas')
-    .update({
-      estado: 'confirmado',
-      codigo_reserva: codigo,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', req.params.id)
-    .select('*')
-    .single();
-
-  if (error) {
-    return res.status(500).json({ error: error.message });
-  }
-
-  return res.status(200).json({
-    message: '¡Reserva confirmada exitosamente!',
-    reserva: data,
-  });
 });
 
 module.exports = router;

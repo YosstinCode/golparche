@@ -48,7 +48,7 @@ router.post('/', async (req, res) => {
       cancha_id: parseInt(cancha_id),
       fecha,
       hora,
-      estado: 'pendiente',
+      estado: 'pagado',
       precio_total: parseInt(precio_total),
     }])
     .select(`
@@ -79,6 +79,29 @@ router.get('/mine', async (req, res) => {
   if (!user_id) {
     return res.status(400).json({ error: 'user_id es requerido.' });
   }
+
+  const { data, error } = await supabaseAdmin
+    .from('reservas')
+    .select(`
+      *,
+      canchas (nombre, tipo, imagen_url)
+    `)
+    .eq('user_id', user_id)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+
+  res.json(data);
+});
+
+/**
+ * GET /bookings/user/:user_id
+ * Alternativa para listar reservas por ID de usuario (usada por el frontend).
+ */
+router.get('/user/:user_id', async (req, res) => {
+  const { user_id } = req.params;
 
   const { data, error } = await supabaseAdmin
     .from('reservas')

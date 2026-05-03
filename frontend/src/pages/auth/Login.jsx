@@ -1,138 +1,203 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Zap, Mail, Lock, LogIn, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { Zap, Mail, Lock, LogIn, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 const Login = () => {
-  const navigate = useNavigate();
-  const { login } = useAuth();
-
-  const [correo, setCorreo] = useState('');
-  const [contrasena, setContrasena] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!correo || !contrasena) {
-      setError('Por favor completa todos los campos.');
-      return;
-    }
     setLoading(true);
     setError('');
-    try {
-      const data = await login(correo, contrasena);
-      // Fetch profile to know the role and redirect accordingly
-      const userId = data.user.id;
-      const { supabase: sb } = await import('../../config/supabase');
-      const { data: profileData } = await sb.from('profiles').select('rol').eq('id', userId).single();
-      navigate('/');
-    } catch (err) {
-      setError('Correo o contraseña incorrectos.');
-    } finally {
+
+    const { error: loginError } = await login(email, password);
+
+    if (loginError) {
+      setError('Credenciales inválidas. Por favor intenta de nuevo.');
       setLoading(false);
+    } else {
+      // Todos los roles van a la home page
+      navigate('/');
     }
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card glass-panel">
-        {/* Logo */}
-        <div className="auth-logo">
-          <Zap size={32} style={{ color: 'var(--primary-color)' }} />
-          <span className="text-gradient" style={{ fontSize: '2rem', fontWeight: 800 }}>Golparche</span>
+    <div className="auth-container animate-fade">
+      <div className="auth-card glass-card">
+        {/* Logo Section */}
+        <div className="auth-header">
+          <div className="auth-logo-bg">
+            <Zap size={32} className="logo-icon" />
+          </div>
+          <h1 className="auth-title">Bienvenido de <span className="text-gradient">Nuevo</span></h1>
+          <p className="auth-subtitle">Ingresa tus credenciales para acceder a tu cuenta</p>
         </div>
-        <h1 className="auth-title">Bienvenido de nuevo</h1>
-        <p className="auth-subtitle">Inicia sesión para gestionar tus reservas</p>
 
-        <form onSubmit={handleSubmit} style={{ marginTop: '2rem' }}>
-          {/* Correo */}
-          <div className="input-group">
-            <label className="input-label" htmlFor="login-email">
-              <Mail size={14} style={{ display: 'inline', marginRight: '0.35rem', verticalAlign: 'middle' }} />
-              Correo electrónico
-            </label>
-            <input
-              id="login-email"
-              type="email"
-              className="form-control"
-              placeholder="tu@correo.com"
-              value={correo}
-              onChange={(e) => { setCorreo(e.target.value); setError(''); }}
-              autoComplete="email"
-            />
+        {/* Error Message */}
+        {error && (
+          <div className="auth-error-banner">
+            <AlertCircle size={18} />
+            <span>{error}</span>
           </div>
+        )}
 
-          {/* Contraseña */}
-          <div className="input-group">
-            <label className="input-label" htmlFor="login-password">
-              <Lock size={14} style={{ display: 'inline', marginRight: '0.35rem', verticalAlign: 'middle' }} />
-              Contraseña
-            </label>
-            <div style={{ position: 'relative' }}>
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="auth-form">
+          <div className="form-group">
+            <label className="form-label">Correo Electrónico</label>
+            <div className="input-wrapper">
+              <Mail className="input-icon" size={18} />
               <input
-                id="login-password"
-                type={showPassword ? 'text' : 'password'}
-                className="form-control"
-                placeholder="••••••••"
-                value={contrasena}
-                onChange={(e) => { setContrasena(e.target.value); setError(''); }}
-                style={{ paddingRight: '3rem' }}
-                autoComplete="current-password"
+                type="email"
+                className="form-input"
+                placeholder="tu@ejemplo.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
             </div>
           </div>
 
-          {/* Olvidaste contraseña */}
-          <div style={{ textAlign: 'right', marginTop: '-0.75rem', marginBottom: '1.5rem' }}>
-            <button
-              type="button"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary-color)', fontSize: '0.85rem' }}
-              onClick={() => alert('Te enviaríamos un enlace de recuperación a tu correo. (Simulación)')}
-            >
-              ¿Olvidaste tu contraseña?
-            </button>
+          <div className="form-group">
+            <label className="form-label">Contraseña</label>
+            <div className="input-wrapper">
+              <Lock className="input-icon" size={18} />
+              <input
+                type="password"
+                className="form-input"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
           </div>
 
-          {/* Error */}
-          {error && (
-            <div className="status-banner status-banner-error" style={{ marginBottom: '1.5rem', marginTop: 0 }}>
-              <AlertCircle size={16} />
-              <span>{error}</span>
-            </div>
-          )}
-
-          {/* Submit */}
-          <button
-            type="submit"
-            className="btn btn-primary"
-            style={{ width: '100%', padding: '1rem', fontSize: '1rem' }}
-            disabled={loading}
-            id="login-submit-btn"
-          >
+          <button type="submit" className="btn btn-primary auth-submit" disabled={loading}>
             {loading ? (
-              <><div className="spinner-sm"></div> Iniciando sesión...</>
+              <Loader2 className="spinner-sm" style={{ animation: 'spin 1s linear infinite' }} />
             ) : (
-              <><LogIn size={18} /> Iniciar sesión</>
+              <>Acceder al sistema <ArrowRight size={18} /></>
             )}
           </button>
         </form>
 
-        <p className="auth-footer">
-          ¿No tienes cuenta?{' '}
-          <Link to="/register" style={{ color: 'var(--primary-color)', fontWeight: 600, textDecoration: 'none' }}>
-            Regístrate gratis
-          </Link>
-        </p>
+        <div className="auth-footer">
+          <p>¿No tienes una cuenta? <Link to="/register" className="auth-link">Regístrate gratis</Link></p>
+        </div>
       </div>
+
+      <style>{`
+        .auth-container {
+          min-height: 90vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 2rem;
+        }
+
+        .auth-card {
+          width: 100%;
+          max-width: 480px;
+          padding: 3.5rem;
+          position: relative;
+        }
+
+        .auth-header {
+          text-align: center;
+          margin-bottom: 2.5rem;
+        }
+
+        .auth-logo-bg {
+          width: 64px;
+          height: 64px;
+          background: linear-gradient(135deg, rgba(0, 210, 255, 0.1), rgba(58, 123, 213, 0.1));
+          border: 1px solid rgba(0, 210, 255, 0.2);
+          border-radius: 18px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin: 0 auto 1.5rem;
+          color: var(--primary);
+        }
+
+        .auth-title {
+          font-size: 2.25rem;
+          margin-bottom: 0.75rem;
+        }
+
+        .auth-subtitle {
+          color: var(--text-muted);
+          font-size: 0.95rem;
+        }
+
+        .auth-error-banner {
+          background: rgba(239, 68, 68, 0.1);
+          border: 1px solid rgba(239, 68, 68, 0.2);
+          color: var(--danger);
+          padding: 0.85rem 1rem;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          margin-bottom: 2rem;
+          font-size: 0.9rem;
+          animation: shake 0.4s ease-in-out;
+        }
+
+        .input-wrapper {
+          position: relative;
+        }
+
+        .input-icon {
+          position: absolute;
+          left: 1.25rem;
+          top: 50%;
+          transform: translateY(-50%);
+          color: var(--text-dim);
+          pointer-events: none;
+        }
+
+        .auth-form .form-input {
+          padding-left: 3.25rem;
+        }
+
+        .auth-submit {
+          width: 100%;
+          padding: 1rem;
+          margin-top: 1rem;
+        }
+
+        .auth-footer {
+          margin-top: 2.5rem;
+          text-align: center;
+          color: var(--text-muted);
+          font-size: 0.9rem;
+        }
+
+        .auth-link {
+          color: var(--primary);
+          text-decoration: none;
+          font-weight: 600;
+          margin-left: 0.25rem;
+        }
+
+        .auth-link:hover {
+          text-decoration: underline;
+        }
+
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-5px); }
+          75% { transform: translateX(5px); }
+        }
+      `}</style>
     </div>
   );
 };

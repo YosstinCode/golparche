@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Zap, LayoutDashboard, CalendarCheck, ClipboardList, LogOut, ArrowLeft } from 'lucide-react';
+import { Zap, LayoutDashboard, CalendarCheck, ClipboardList, LogOut, ArrowLeft, BarChart2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import '../../styles/admin.css';
 
@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { label: 'Dashboard',   path: '/admin',            icon: LayoutDashboard },
   { label: 'Reservas',    path: '/admin/bookings',   icon: ClipboardList },
   { label: 'Asistencia',  path: '/admin/attendance', icon: CalendarCheck },
+  { label: 'Reportes',    path: '/admin/reports',    icon: BarChart2 },
 ];
 
 const AdminLayout = ({ children }) => {

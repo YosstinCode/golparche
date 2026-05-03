@@ -1,419 +1,383 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import {
-  CreditCard,
-  Lock,
-  CheckCircle,
-  XCircle,
-  Loader2,
-  ArrowLeft,
-  AlertTriangle,
-  ShieldCheck,
-  Banknote,
-  Calendar,
-  Clock,
+import { 
+  CreditCard, ShieldCheck, Lock, ArrowLeft, 
+  ChevronRight, Calendar, Clock, MapPin, 
+  AlertCircle, CheckCircle2, Loader2, Info
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const API_BASE_URL = 'http://localhost:3001';
 
-// ── Helpers ─────────────────────────────────────────────────────
-const formatCardNumber = (val) =>
-  val.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim();
-
-const formatExpiry = (val) => {
-  const digits = val.replace(/\D/g, '').slice(0, 4);
-  return digits.length >= 3 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
-};
-
-const maskCardNumber = (num) => {
-  const clean = num.replace(/\s/g, '');
-  if (clean.length < 4) return num;
-  return `**** **** **** ${clean.slice(-4)}`;
-};
-
-// ── Component ────────────────────────────────────────────────────
 const Payment = () => {
   const location = useLocation();
   const navigate = useNavigate();
-
+  const { user } = useAuth();
   const { booking } = location.state || {};
 
-  const [form, setForm] = useState({
-    card_number: '',
-    card_holder: '',
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [cardData, setCardData] = useState({
+    number: '',
+    name: '',
     expiry: '',
-    cvv: '',
+    cvc: '',
   });
-  const [paymentStatus, setPaymentStatus] = useState('idle'); // idle | loading | approved | rejected
-  const [responseData, setResponseData] = useState(null);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [cardFlipped, setCardFlipped] = useState(false);
 
-  // Guard: redirect if arrived without booking data
   useEffect(() => {
     if (!booking) navigate('/');
   }, [booking, navigate]);
 
-  if (!booking) return null;
-
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    if (name === 'card_number') setForm(f => ({ ...f, card_number: formatCardNumber(value) }));
-    else if (name === 'expiry')  setForm(f => ({ ...f, expiry: formatExpiry(value) }));
-    else if (name === 'cvv')     setForm(f => ({ ...f, cvv: value.replace(/\D/g, '').slice(0, 3) }));
-    else setForm(f => ({ ...f, [name]: value }));
+    let { name, value } = e.target;
+    
+    // Formatting logic
+    if (name === 'number') {
+      value = value.replace(/\D/g, '').substring(0, 16);
+      value = value.replace(/(\d{4})(?=\d)/g, '$1 ');
+    }
+    if (name === 'expiry') {
+      value = value.replace(/\D/g, '').substring(0, 4);
+      if (value.length > 2) value = value.substring(0, 2) + '/' + value.substring(2);
+    }
+    if (name === 'cvc') {
+      value = value.replace(/\D/g, '').substring(0, 3);
+    }
+    if (name === 'name') {
+      value = value.toUpperCase();
+    }
+
+    setCardData({ ...cardData, [name]: value });
+  };
+
+  const validateCard = () => {
+    const num = cardData.number.replace(/\s/g, '');
+    if (num.length !== 16) return 'Número de tarjeta inválido.';
+    
+    const [month, year] = cardData.expiry.split('/');
+    const m = parseInt(month);
+    if (!m || m < 1 || m > 12) return 'Mes de expiración inválido.';
+    
+    const now = new Date();
+    const currentYearShort = now.getFullYear() % 100;
+    const currentMonth = now.getMonth() + 1;
+    const expYear = parseInt(year);
+    const expMonth = parseInt(month);
+
+    if (expYear < currentYearShort || (expYear === currentYearShort && expMonth < currentMonth)) {
+      return 'La tarjeta ha expirado.';
+    }
+    
+    if (cardData.cvc.length < 3) return 'CVC inválido.';
+    return null;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setPaymentStatus('loading');
-    setErrorMessage('');
+    const validationError = validateCard();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    setLoading(true);
+    setError('');
 
     try {
-      const res = await fetch(`${API_BASE_URL}/payments`, {
+      const response = await fetch(`${API_BASE_URL}/bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          booking_id: booking.id,
-          card_number: form.card_number,
-          card_holder: form.card_holder,
-          expiry: form.expiry,
-          cvv: form.cvv,
-        }),
+          user_id: user.id, // Corregido: antes era usuario_id
+          cancha_id: booking.cancha_id,
+          fecha: booking.fecha,
+          hora: booking.hora,
+          precio_total: booking.precio_total
+        })
       });
 
-      const data = await res.json();
-
-      if (res.status === 402 || !data.approved) {
-        setPaymentStatus('rejected');
-        setErrorMessage(data.error || 'Pago rechazado');
-        return;
+      const data = await response.json();
+      if (response.ok) {
+        navigate('/confirmation', { state: { booking: data.reserva } });
+      } else {
+        setError(data.error || 'Hubo un problema al procesar tu pago.');
       }
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Error al procesar el pago');
-      }
-
-      setResponseData(data);
-      setPaymentStatus('approved');
-
-      // Navigate to Increment 5 confirmation screen
-      navigate('/confirmation', {
-        state: {
-          booking: data.reserva,
-          transaccion_id: data.transaccion_id,
-          card_last4: form.card_number.replace(/\s/g, '').slice(-4),
-        },
-      });
-
     } catch (err) {
-      setPaymentStatus('rejected');
-      setErrorMessage(err.message);
+      setError('Error de conexión con el servidor.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const isFormValid =
-    form.card_number.replace(/\s/g, '').length === 16 &&
-    form.card_holder.trim().length > 2 &&
-    form.expiry.length === 5 &&
-    form.cvv.length === 3;
+  if (!booking) return null;
 
-  // ── Approved view ────────────────────────────────────────────
-  if (paymentStatus === 'approved' && responseData) {
-    return (
-      <div style={{ animation: 'pageSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)', maxWidth: '520px', margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{
-            width: '80px', height: '80px', borderRadius: '50%',
-            background: 'rgba(34, 197, 94, 0.15)',
-            border: '2px solid rgba(34, 197, 94, 0.5)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 1.5rem',
-            boxShadow: '0 0 40px rgba(34, 197, 94, 0.25)',
-            animation: 'scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
-          }}>
-            <CheckCircle size={42} style={{ color: 'var(--success-color)' }} />
-          </div>
-          <h2 style={{ margin: '0 0 0.5rem', color: 'var(--success-color)' }}>¡Pago aprobado!</h2>
-          <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
-            Tu reserva ha sido pagada exitosamente.
-          </p>
-        </div>
-
-        {/* Receipt card */}
-        <div className="summary-card" style={{ marginBottom: '1.5rem' }}>
-          <div className="summary-card-header">
-            <ShieldCheck size={22} style={{ color: 'var(--success-color)', flexShrink: 0 }} />
-            <div>
-              <div style={{ fontWeight: 700 }}>Comprobante de pago</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'monospace', marginTop: '0.1rem' }}>
-                {responseData.transaccion_id}
-              </div>
-            </div>
-          </div>
-          <div className="summary-card-body">
-            <div className="summary-row">
-              <span className="summary-label"><Calendar size={14} /> Cancha</span>
-              <span className="summary-value">{responseData.reserva.cancha_nombre}</span>
-            </div>
-            <div className="summary-row">
-              <span className="summary-label"><Calendar size={14} /> Fecha</span>
-              <span className="summary-value">{responseData.reserva.fecha}</span>
-            </div>
-            <div className="summary-row">
-              <span className="summary-label"><Clock size={14} /> Hora</span>
-              <span className="summary-value">{responseData.reserva.hora}</span>
-            </div>
-            <div className="summary-row">
-              <span className="summary-label"><CreditCard size={14} /> Tarjeta</span>
-              <span className="summary-value">{maskCardNumber(form.card_number)}</span>
-            </div>
-            <div className="summary-row" style={{ borderTop: '2px solid rgba(255,255,255,0.07)', paddingTop: '1.25rem', marginTop: '0.5rem' }}>
-              <span className="summary-label" style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '1rem' }}>
-                <Banknote size={15} /> Total pagado
-              </span>
-              <span className="summary-value-accent" style={{ fontSize: '1.5rem' }}>
-                ${responseData.reserva.precio_total.toLocaleString('es-CO')} COP
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ background: 'rgba(34, 197, 94, 0.08)', border: '1px solid rgba(34, 197, 94, 0.25)', borderRadius: '12px', padding: '1rem 1.25rem', marginBottom: '2rem', display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          <CheckCircle size={18} style={{ color: 'var(--success-color)', flexShrink: 0 }} />
-          <div style={{ fontSize: '0.875rem', color: 'var(--success-color)' }}>
-            Estado de la reserva: <strong>PAGADO</strong>. Próximo paso: confirmación final (Incremento 5).
-          </div>
-        </div>
-
-        <button className="btn btn-primary" onClick={() => navigate('/')} style={{ width: '100%', padding: '1rem', fontSize: '1rem' }}>
-          Hacer otra reserva
-        </button>
-
-        <style>{`
-          @keyframes pageSlideIn { from { opacity:0; transform:translateX(30px); } to { opacity:1; transform:translateX(0); } }
-          @keyframes scaleIn { from { transform:scale(0.5); opacity:0; } to { transform:scale(1); opacity:1; } }
-        `}</style>
-      </div>
-    );
-  }
-
-  // ── Payment form view ────────────────────────────────────────
   return (
-    <div style={{ animation: 'pageSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)' }}>
-      {/* Header */}
-      <div style={{ marginBottom: '2rem' }}>
-        <button
-          className="btn btn-outline"
-          onClick={() => navigate(-1)}
-          style={{ padding: '0.5rem 1.25rem', fontSize: '0.875rem', marginBottom: '1.5rem' }}
-          disabled={paymentStatus === 'loading'}
-        >
-          <ArrowLeft size={16} /> Volver
+    <div className="payment-page animate-fade">
+      <div className="payment-header">
+        <button className="btn-back" onClick={() => navigate(-1)}>
+          <ArrowLeft size={20} /> <span>Revisar horario</span>
         </button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-          <h2 style={{ margin: 0 }}>Pagar reserva</h2>
-          <span className="badge" style={{ background: 'rgba(0,210,255,0.1)', color: 'var(--primary-color)', border: '1px solid rgba(0,210,255,0.3)' }}>
-            <Lock size={11} /> Pago seguro
-          </span>
-        </div>
-        <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-          Ingresa los datos de tu tarjeta para completar la reserva.
-        </p>
+        <h1 className="payment-title">Finalizar <span className="text-gradient">Pago</span></h1>
       </div>
 
-      <div style={{ display: 'grid', gap: '2rem', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
-        {/* Left: Order summary */}
-        <div>
-          <div className="summary-card">
-            <div className="summary-card-header">
-              <Banknote size={20} style={{ color: 'var(--accent-color)', flexShrink: 0 }} />
-              <div>
-                <div style={{ fontWeight: 700 }}>Resumen del pedido</div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.1rem' }}>
-                  ID: {booking.id.split('-')[0].toUpperCase()}
-                </div>
-              </div>
-            </div>
-            <div className="summary-card-body">
-              <div className="summary-row">
-                <span className="summary-label"><Calendar size={14} /> Cancha</span>
-                <span className="summary-value" style={{ fontSize: '0.9rem' }}>{booking.cancha_nombre}</span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label"><Calendar size={14} /> Fecha</span>
-                <span className="summary-value">{booking.fecha}</span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label"><Clock size={14} /> Hora</span>
-                <span className="summary-value">{booking.hora}</span>
-              </div>
-              <div className="summary-row" style={{ borderTop: '2px solid rgba(255,255,255,0.07)', paddingTop: '1.25rem', marginTop: '0.5rem' }}>
-                <span className="summary-label" style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Total</span>
-                <span className="summary-value-accent" style={{ fontSize: '1.4rem' }}>
-                  ${booking.precio_total.toLocaleString('es-CO')} COP
-                </span>
-              </div>
-            </div>
+      <div className="payment-grid">
+        {/* Left: Form */}
+        <div className="payment-form-panel glass-card">
+          <div className="secure-badge">
+            <ShieldCheck size={18} />
+            <span>Pago Seguro Encriptado SSL</span>
           </div>
 
-          {/* Hint */}
-          <div style={{ marginTop: '1rem', background: 'rgba(252,163,17,0.08)', border: '1px solid rgba(252,163,17,0.25)', borderRadius: '10px', padding: '0.75rem 1rem', fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', gap: '0.5rem' }}>
-            <AlertTriangle size={14} style={{ color: 'var(--accent-color)', flexShrink: 0, marginTop: '0.1rem' }} />
-            <span>Usa CVV <strong style={{ color: 'var(--accent-color)' }}>000</strong> para simular un pago rechazado. Cualquier otro CVV aprueba el pago.</span>
-          </div>
-        </div>
-
-        {/* Right: Card form */}
-        <div>
-          {/* Visual card */}
-          <div
-            className="credit-card-visual"
-            style={{ marginBottom: '1.5rem', perspective: '1000px', cursor: 'default' }}
-            onMouseEnter={() => setCardFlipped(form.cvv.length > 0)}
-            onMouseLeave={() => setCardFlipped(false)}
-          >
-            <div style={{
-              position: 'relative', width: '100%', paddingBottom: '56.25%',
-              transition: 'transform 0.6s ease',
-              transformStyle: 'preserve-3d',
-              transform: cardFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
-            }}>
-              {/* Front */}
-              <div style={{
-                position: 'absolute', inset: 0, borderRadius: '16px',
-                background: 'linear-gradient(135deg, #1a1f6b, #00d2ff)',
-                padding: '1.5rem', backfaceVisibility: 'hidden',
-                display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-                boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ width: '40px', height: '30px', background: 'rgba(255,255,255,0.2)', borderRadius: '6px' }} />
-                  <CreditCard size={28} style={{ color: 'rgba(255,255,255,0.8)' }} />
-                </div>
-                <div>
-                  <div style={{ fontFamily: 'monospace', fontSize: '1.1rem', letterSpacing: '0.2em', color: 'rgba(255,255,255,0.9)', marginBottom: '1rem' }}>
-                    {form.card_number || '**** **** **** ****'}
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <div>
-                      <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Titular</div>
-                      <div style={{ fontSize: '0.9rem', color: 'white', fontWeight: 600 }}>{form.card_holder || 'NOMBRE APELLIDO'}</div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Vence</div>
-                      <div style={{ fontSize: '0.9rem', color: 'white', fontWeight: 600 }}>{form.expiry || 'MM/AA'}</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Back */}
-              <div style={{
-                position: 'absolute', inset: 0, borderRadius: '16px',
-                background: 'linear-gradient(135deg, #0f172a, #1e293b)',
-                backfaceVisibility: 'hidden', transform: 'rotateY(180deg)',
-                boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
-                overflow: 'hidden',
-              }}>
-                <div style={{ background: '#1e293b', height: '45px', marginTop: '1.5rem' }} />
-                <div style={{ padding: '1rem 1.5rem' }}>
-                  <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>CVV</div>
-                  <div style={{
-                    background: 'rgba(255,255,255,0.1)', borderRadius: '6px',
-                    padding: '0.5rem 1rem', fontFamily: 'monospace',
-                    fontSize: '1rem', letterSpacing: '0.3em', color: 'white',
-                  }}>
-                    {form.cvv ? '•'.repeat(form.cvv.length) : '•••'}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Form */}
-          <form onSubmit={handleSubmit}>
-            <div className="input-group">
-              <label className="input-label" htmlFor="card_number">
-                <CreditCard size={13} style={{ display: 'inline', marginRight: '0.35rem', verticalAlign: 'middle' }} />
-                Número de tarjeta
-              </label>
+          <form onSubmit={handleSubmit} className="payment-form">
+            <div className="form-group">
+              <label className="form-label">Titular de la Tarjeta</label>
               <input
-                id="card_number" name="card_number" type="text"
-                className="form-control" placeholder="1234 5678 9012 3456"
-                value={form.card_number} onChange={handleChange}
-                disabled={paymentStatus === 'loading'}
-                style={{ fontFamily: 'monospace', letterSpacing: '0.1em' }}
-              />
-            </div>
-
-            <div className="input-group">
-              <label className="input-label" htmlFor="card_holder">Nombre en la tarjeta</label>
-              <input
-                id="card_holder" name="card_holder" type="text"
-                className="form-control" placeholder="NOMBRE APELLIDO"
-                value={form.card_holder} onChange={handleChange}
-                disabled={paymentStatus === 'loading'}
+                name="name"
+                type="text"
+                className="form-input"
+                placeholder="NOMBRE COMO APARECE EN LA TARJETA"
                 style={{ textTransform: 'uppercase' }}
+                value={cardData.name}
+                onChange={handleChange}
+                required
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <div className="input-group">
-                <label className="input-label" htmlFor="expiry">Vencimiento</label>
+            <div className="form-group">
+              <label className="form-label">Número de Tarjeta</label>
+              <div className="card-input-wrapper">
+                <CreditCard className="input-icon" size={20} />
                 <input
-                  id="expiry" name="expiry" type="text"
-                  className="form-control" placeholder="MM/AA"
-                  value={form.expiry} onChange={handleChange}
-                  disabled={paymentStatus === 'loading'}
-                />
-              </div>
-              <div className="input-group">
-                <label className="input-label" htmlFor="cvv">
-                  <Lock size={12} style={{ display: 'inline', marginRight: '0.3rem', verticalAlign: 'middle' }} />
-                  CVV
-                </label>
-                <input
-                  id="cvv" name="cvv" type="text"
-                  className="form-control" placeholder="123"
-                  value={form.cvv} onChange={handleChange}
-                  onFocus={() => setCardFlipped(true)}
-                  onBlur={() => setCardFlipped(false)}
-                  disabled={paymentStatus === 'loading'}
-                  style={{ fontFamily: 'monospace', letterSpacing: '0.3em' }}
+                  name="number"
+                  type="text"
+                  className="form-input with-icon"
+                  placeholder="0000 0000 0000 0000"
+                  value={cardData.number}
+                  onChange={handleChange}
+                  required
                 />
               </div>
             </div>
 
-            {/* Rejected banner */}
-            {paymentStatus === 'rejected' && (
-              <div className="status-banner status-banner-error" style={{ marginTop: '1rem', marginBottom: '0.5rem' }}>
-                <XCircle size={20} style={{ flexShrink: 0 }} />
-                <div>
-                  <div style={{ fontWeight: 600 }}>Pago rechazado</div>
-                  <div style={{ fontSize: '0.85rem', opacity: 0.85, marginTop: '0.2rem' }}>{errorMessage}</div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Expiración</label>
+                <input
+                  name="expiry"
+                  type="text"
+                  className="form-input"
+                  placeholder="MM/YY"
+                  value={cardData.expiry}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">CVC / CVV</label>
+                <div className="card-input-wrapper">
+                  <Lock className="input-icon" size={18} />
+                  <input
+                    name="cvc"
+                    type="password"
+                    className="form-input with-icon"
+                    placeholder="•••"
+                    value={cardData.cvc}
+                    onChange={handleChange}
+                    required
+                  />
                 </div>
+              </div>
+            </div>
+
+            {error && (
+              <div className="payment-error animate-slide">
+                <AlertCircle size={18} />
+                <span>{error}</span>
               </div>
             )}
 
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={!isFormValid || paymentStatus === 'loading'}
-              style={{ width: '100%', marginTop: '1.5rem', padding: '1rem', fontSize: '1.05rem' }}
-            >
-              {paymentStatus === 'loading' ? (
-                <><Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Procesando pago...</>
+            <button type="submit" className="btn btn-primary btn-full" disabled={loading}>
+              {loading ? (
+                <Loader2 className="spinner-sm animate-spin" />
               ) : (
-                <><Lock size={16} /> Pagar ${booking.precio_total.toLocaleString('es-CO')} COP</>
+                <>Pagar ${(booking.precio_total).toLocaleString('es-CO')} <ChevronRight size={20} /></>
               )}
             </button>
           </form>
+
+          <div className="payment-trust">
+            <div className="trust-item">
+              <CheckCircle2 size={16} /> <span>Cancelación gratuita (24h antes)</span>
+            </div>
+            <div className="trust-item">
+              <CheckCircle2 size={16} /> <span>Confirmación inmediata</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Summary Card */}
+        <div className="payment-summary-panel">
+          <div className="summary-card glass-card">
+            <h3 className="summary-card-title">Resumen de Reserva</h3>
+            
+            <div className="summary-court-info">
+              <img src={booking.imagen_url} alt={booking.cancha_nombre} className="summary-img" />
+              <div>
+                <h4 className="summary-court-name">{booking.cancha_nombre}</h4>
+                <div className="summary-meta"><MapPin size={12} /> Girardot, Cundinamarca</div>
+              </div>
+            </div>
+
+            <div className="summary-details">
+              <div className="summary-row">
+                <span className="row-label"><Calendar size={14} /> Fecha</span>
+                <span className="row-value">{booking.fecha}</span>
+              </div>
+              <div className="summary-row">
+                <span className="row-label"><Clock size={14} /> Horario</span>
+                <span className="row-value">{booking.hora.substring(0, 5)} - 60 min</span>
+              </div>
+              <div className="summary-row">
+                <span className="row-label">Subtotal</span>
+                <span className="row-value">${booking.precio_total.toLocaleString('es-CO')}</span>
+              </div>
+              <div className="summary-row">
+                <span className="row-label">Tasa de servicio</span>
+                <span className="row-value">$0</span>
+              </div>
+              <div className="total-row">
+                <span className="total-label">Total a Pagar</span>
+                <span className="total-value">${booking.precio_total.toLocaleString('es-CO')} COP</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="payment-info-box">
+            <Info size={20} />
+            <p>Al completar el pago, recibirás un código QR único que deberás presentar al ingresar a las instalaciones.</p>
+          </div>
         </div>
       </div>
 
       <style>{`
-        @keyframes pageSlideIn { from { opacity:0; transform:translateX(30px); } to { opacity:1; transform:translateX(0); } }
+        .payment-page { padding-bottom: 5rem; }
+        .payment-header { margin-bottom: 3rem; text-align: center; }
+        .btn-back {
+          background: transparent;
+          border: none;
+          color: var(--text-muted);
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          cursor: pointer;
+          font-weight: 600;
+          margin-bottom: 1rem;
+          transition: var(--transition);
+        }
+        .btn-back:hover { color: var(--primary); }
+        .payment-title { font-size: 3rem; }
+
+        .payment-grid {
+          display: grid;
+          grid-template-columns: 1.2fr 1fr;
+          gap: 3rem;
+          align-items: start;
+        }
+
+        /* Form Panel */
+        .payment-form-panel { padding: 3rem; }
+        .secure-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.6rem;
+          background: rgba(34, 197, 94, 0.1);
+          color: var(--success);
+          padding: 0.5rem 1.25rem;
+          border-radius: 999px;
+          font-size: 0.85rem;
+          font-weight: 700;
+          margin-bottom: 2.5rem;
+          border: 1px solid rgba(34, 197, 94, 0.2);
+        }
+
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        .card-input-wrapper { position: relative; }
+        .input-icon { position: absolute; left: 1.25rem; top: 50%; transform: translateY(-50%); color: var(--text-dim); }
+        .form-input.with-icon { padding-left: 3.25rem; }
+
+        .payment-error {
+          background: rgba(239, 68, 68, 0.1);
+          border: 1px solid rgba(239, 68, 68, 0.2);
+          color: var(--danger);
+          padding: 1rem;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          margin-bottom: 1.5rem;
+          font-size: 0.9rem;
+        }
+
+        .btn-full { width: 100%; padding: 1.1rem; font-size: 1.1rem; margin-top: 1rem; }
+
+        .payment-trust {
+          display: flex;
+          gap: 2rem;
+          margin-top: 2.5rem;
+          padding-top: 2rem;
+          border-top: 1px solid rgba(255,255,255,0.05);
+        }
+        .trust-item { display: flex; align-items: center; gap: 0.6rem; color: var(--text-muted); font-size: 0.85rem; font-weight: 600; }
+        .trust-item svg { color: var(--success); }
+
+        /* Summary Panel */
+        .summary-card { padding: 2rem; }
+        .summary-card-title { font-size: 1.5rem; margin-bottom: 1.5rem; }
+        .summary-court-info {
+          display: flex;
+          gap: 1.25rem;
+          align-items: center;
+          margin-bottom: 2rem;
+          padding-bottom: 1.5rem;
+          border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .summary-img { width: 80px; height: 80px; border-radius: 16px; object-fit: cover; }
+        .summary-court-name { font-size: 1.2rem; margin-bottom: 0.25rem; }
+        .summary-meta { font-size: 0.8rem; color: var(--text-dim); display: flex; align-items: center; gap: 0.4rem; }
+
+        .summary-details { display: grid; gap: 1rem; }
+        .summary-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; color: var(--text-muted); }
+        .row-label { display: flex; align-items: center; gap: 0.6rem; }
+        .row-value { color: var(--text-main); font-weight: 600; }
+
+        .total-row {
+          margin-top: 1rem;
+          padding-top: 1.5rem;
+          border-top: 1px dashed rgba(255,255,255,0.1);
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+        }
+        .total-label { font-weight: 700; color: var(--text-main); font-size: 1rem; }
+        .total-value { font-size: 1.75rem; font-weight: 800; color: var(--accent); font-family: 'Outfit', sans-serif; }
+
+        .payment-info-box {
+          margin-top: 2rem;
+          padding: 1.5rem;
+          background: rgba(0, 210, 255, 0.05);
+          border: 1px solid rgba(0, 210, 255, 0.1);
+          border-radius: 20px;
+          display: flex;
+          gap: 1rem;
+          color: var(--text-muted);
+          font-size: 0.9rem;
+          line-height: 1.6;
+        }
+        .payment-info-box svg { color: var(--primary); flex-shrink: 0; }
+
+        @media (max-width: 1024px) {
+          .payment-grid { grid-template-columns: 1fr; }
+        }
       `}</style>
     </div>
   );
