@@ -38,6 +38,8 @@ const MyBookings = () => {
         return <span className="badge badge-success"><CheckCircle size={12} /> Confirmada</span>;
       case 'pagado':
         return <span className="badge badge-success"><CheckCircle size={12} /> Pagada</span>;
+      case 'completada':
+        return <span className="badge badge-success"><CheckCircle size={12} /> Completada</span>;
       case 'pendiente':
         return <span className="badge badge-warning" style={{ background: 'rgba(252, 163, 17, 0.2)', color: 'var(--accent-color)' }}><Clock3 size={12} /> Pendiente</span>;
       case 'cancelada':

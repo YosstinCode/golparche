@@ -27,11 +27,7 @@ const Login = () => {
       const userId = data.user.id;
       const { supabase: sb } = await import('../../config/supabase');
       const { data: profileData } = await sb.from('profiles').select('rol').eq('id', userId).single();
-      if (profileData?.rol === 'admin') {
-        navigate('/admin');
-      } else {
-        navigate('/');
-      }
+      navigate('/');
     } catch (err) {
       setError('Correo o contraseña incorrectos.');
     } finally {

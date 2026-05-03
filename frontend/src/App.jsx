@@ -11,6 +11,10 @@ import MyBookings from './pages/client/MyBookings';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminBookings from './pages/admin/AdminBookings';
+import AdminAttendance from './pages/admin/AdminAttendance';
+
 import './styles/design-system.css';
 
 const CLIENT_STEPS = [
@@ -56,11 +60,12 @@ const StepIndicator = () => {
 };
 
 const Header = () => {
-  const { user, profile, logout } = useAuth();
+  const { user, profile, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   if (AUTH_PATHS.includes(location.pathname)) return null;
+  if (location.pathname.startsWith('/admin')) return null; // Admin has its own sidebar
 
   const handleLogout = async () => {
     await logout();
@@ -76,6 +81,15 @@ const Header = () => {
       <StepIndicator />
       {user && (
         <div className="header-user-controls">
+          {isAdmin() && (
+            <button
+              className="btn btn-primary"
+              style={{ padding: '0.4rem 0.9rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+              onClick={() => navigate('/admin')}
+            >
+              Panel Admin
+            </button>
+          )}
           <button
             className="btn btn-outline"
             style={{ padding: '0.4rem 0.9rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
@@ -117,6 +131,11 @@ function AppContent() {
           <Route path="/payment" element={<ProtectedRoute><Payment /></ProtectedRoute>} />
           <Route path="/confirmation" element={<ProtectedRoute><Confirmation /></ProtectedRoute>} />
           <Route path="/my-bookings" element={<ProtectedRoute><MyBookings /></ProtectedRoute>} />
+
+          {/* Protected Admin Routes */}
+          <Route path="/admin" element={<ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>} />
+          <Route path="/admin/bookings" element={<ProtectedRoute requiredRole="admin"><AdminBookings /></ProtectedRoute>} />
+          <Route path="/admin/attendance" element={<ProtectedRoute requiredRole="admin"><AdminAttendance /></ProtectedRoute>} />
         </Routes>
       </main>
     </div>
