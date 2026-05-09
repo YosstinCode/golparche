@@ -310,9 +310,15 @@ const BookingSummary = () => {
         .summary-text { font-size: 1rem; color: var(--text-main); }
         .summary-hint { color: var(--text-dim); font-size: 0.9rem; font-style: italic; }
         .btn-full { width: 100%; padding: 1.1rem; font-size: 1.1rem; }
-
-        .custom-date { background: rgba(0, 210, 255, 0.05); border-color: var(--primary-glow); }
-
+        .custom-date {
+          background: rgba(0, 210, 255, 0.05);
+          border-color: var(--primary-glow);
+          color: var(--text-main);
+        }
+        .form-input.custom-date::-webkit-calendar-picker-indicator {
+          filter: brightness(0) invert(1) !important;
+          cursor: pointer;
+        }
         @media (max-width: 1024px) {
           .checkout-grid { grid-template-columns: 1fr; }
         }
